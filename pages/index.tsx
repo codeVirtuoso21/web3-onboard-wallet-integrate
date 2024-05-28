@@ -1,33 +1,126 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import styles from '../styles/Home.module.css'
-
-import { useConnectWallet } from '@web3-onboard/react'
-import { ethers } from 'ethers'
+import Head from "next/head";
+import Image from "next/image";
+import styles from "../styles/Home.module.css";
+import { ERC725 } from "@erc725/erc725.js";
+import { useConnectWallet } from "@web3-onboard/react";
+import { ethers } from "ethers";
+import LSP4DigitalAsset from "@erc725/erc725.js/schemas/LSP4DigitalAsset.json";
+import LSP8Collection from "../smartcontracts/artifacts/LSP8Collection.json";
 
 const buttonStyles = {
-  borderRadius: '6px',
-  background: '#111827',
-  border: 'none',
-  fontSize: '18px',
-  fontWeight: '600',
-  cursor: 'pointer',
-  color: 'white',
-  padding: '14px 12px',
-  marginTop: '40px',
-  fontFamily: 'inherit'
-}
+  borderRadius: "6px",
+  background: "#111827",
+  border: "none",
+  fontSize: "18px",
+  fontWeight: "600",
+  cursor: "pointer",
+  color: "white",
+  padding: "14px 12px",
+  marginTop: "40px",
+  fontFamily: "inherit",
+};
 
 export default function Home() {
-  const [{ wallet, connecting }, connect, disconnect] = useConnectWallet()
+  const [{ wallet, connecting }, connect, disconnect] = useConnectWallet();
 
   // create an ethers provider
-  let ethersProvider
-
+  let ethersProvider;
   if (wallet) {
-    ethersProvider = new ethers.providers.Web3Provider(wallet.provider, 'any')
+    ethersProvider = new ethers.providers.Web3Provider(wallet.provider, "any");
   }
-  
+
+  const handleLspMint = async () => {
+    if (wallet) {
+      ethersProvider = new ethers.providers.Web3Provider(
+        wallet.provider,
+        "any"
+      );
+      console.log("wallet", wallet.accounts[0].address);
+      const owner = wallet.accounts[0].address;
+      const provider = wallet.provider;
+      const signer = await ethersProvider.getSigner(owner);
+      console.log("provider", provider);
+      const lsp7SubCollectionMetadata = {
+        LSP4Metadata: {
+          // name: 'Daily Selfie',
+          headline: "headline",
+          description: "description",
+          links: [],
+          icons: [
+            {
+              width: 256,
+              height: 256,
+              url: "ipfs://QmcwYFhGP7KBo1a4EvbBxuvDf3jQ2bw1dfMEovATRJZetX",
+              verification: {
+                method: "keccak256(bytes)",
+                data: "0xdd6b5fb6dc984fda0222fb6f6e96b471c0667b12f03b1e804f7b5e6ab62acdb0",
+              },
+            },
+          ],
+          images: [
+            [
+              {
+                width: 1024,
+                height: 974,
+                url: "ipfs://QmcwYFhGP7KBo1a4EvbBxuvDf3jQ2bw1dfMEovATRJZetX",
+                verification: {
+                  method: "keccak256(bytes)",
+                  data: "0x951bf983a4b7bcebc5c0b00a5e783630dcb788e95ee9e44b0b7d4bde4a0b4d81",
+                },
+              },
+            ],
+          ],
+          assets: [
+            {
+              verification: {
+                method: "keccak256(bytes)",
+                data: "0x88f3d704f3d534267c564019ce2b70a5733d070e71bf2c1f85b5fc487f47a46f",
+              },
+              url: "ipfs://QmcwYFhGP7KBo1a4EvbBxuvDf3jQ2bw1dfMEovATRJZetX",
+              fileType: "jpg",
+            },
+          ],
+          attributes: [],
+        },
+      };
+      const lsp7SubCollectionMetadataCID =
+        "ipfs://QmcwYFhGP7KBo1a4EvbBxuvDf3jQ2bw1dfMEovATRJZetX";
+      const erc725 = new ERC725(LSP4DigitalAsset, "", "", {});
+      const encodeLSP7Metadata = erc725.encodeData([
+        {
+          keyName: "LSP4Metadata",
+          value: {
+            json: lsp7SubCollectionMetadata,
+            url: lsp7SubCollectionMetadataCID,
+          },
+        },
+      ]);
+      console.log("encodeLSP7Metadata", encodeLSP7Metadata.values[0]);
+
+      const LSP8CollectionContractAddress =
+        "0x104a441ece8292f554f90b68533e94d05344faf9";
+
+      const LSP8contract = new ethers.Contract(
+        LSP8CollectionContractAddress,
+        LSP8Collection.abi,
+        signer
+      );
+
+      const tx = await LSP8contract.mint(
+        "tokenName", // tokenName
+        "tokenSymbol", //tokenSymbol
+        1, //token type, if 1, NFT
+        true, // isNonDivisible
+        4, // totalSupplyofLSP7
+        owner, //receiverOfInitialTokens_
+        encodeLSP7Metadata.values[0]
+      );
+      console.log("Transaction sent:", tx.hash);
+      const receipt = await tx.wait();
+      console.log("Transaction confirmed:", receipt);
+    }
+  };
+
   return (
     <div className={styles.container}>
       <Head>
@@ -37,18 +130,19 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to this demo of{' '}
-          <a href="https://onboard.blocknative.com"> Web3-Onboard!</a>
-        </h1>
-
         <button
           style={buttonStyles}
           disabled={connecting}
           onClick={() => (wallet ? disconnect(wallet) : connect())}
         >
-          {connecting ? 'Connecting' : wallet ? 'Disconnect' : 'Connect'}
+          {connecting ? "Connecting" : wallet ? "Disconnect" : "Connect"}
         </button>
+
+        <div>
+          <button style={buttonStyles} onClick={() => handleLspMint()}>
+            Mint
+          </button>
+        </div>
       </main>
 
       <footer className={styles.footer}>
@@ -57,12 +151,12 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          Powered by{' '}
+          Powered by{" "}
           <span className={styles.logo}>
             <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
           </span>
         </a>
       </footer>
     </div>
-  )
+  );
 }
